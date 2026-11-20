@@ -21,13 +21,17 @@ if [ -n "${HC_TERMINAL_ID:-}" ] && [ -n "${PS1:-}" ]; then
   }
 
   # hc from PATH, else beside herdr-core (the terminal's shell is its child).
-  __herdr_resume_hc() {
+  __herdr_resume_hcbin() {
     if command -v hc >/dev/null 2>&1; then
-      hc "$@"
+      command -v hc
     else
       local core
-      core=$(readlink "/proc/$PPID/exe" 2>/dev/null) && [ -x "${core%/*}/hc" ] && "${core%/*}/hc" "$@"
+      core=$(readlink "/proc/$PPID/exe" 2>/dev/null) && [ -x "${core%/*}/hc" ] && printf '%s\n' "${core%/*}/hc"
     fi
+  }
+  __herdr_resume_hc() {
+    local bin
+    bin=$(__herdr_resume_hcbin) && "$bin" "$@"
   }
 
   __herdr_resume_forget() {
@@ -63,9 +67,13 @@ if [ -n "${HC_TERMINAL_ID:-}" ] && [ -n "${PS1:-}" ]; then
       return 0
     fi
     [ -d "$herdr_resume_cwd" ] && [ "$PWD" != "$herdr_resume_cwd" ] && cd -- "$herdr_resume_cwd"
-    if [ -n "${ZSH_VERSION:-}" ]; then print -s -- "$herdr_resume_cmd"; else history -s -- "$herdr_resume_cmd"; fi
-    printf '\033[2mherdr: resuming %s\033[0m\n' "$herdr_resume_cmd"
-    eval "$herdr_resume_cmd"
+    printf '\033[2mherdr: resuming the agent this terminal ran\033[0m\n'
+    # Typed at the prompt by herdr-core, as if by hand, once the shell is ready: run from here the
+    # agent would share the shell's process group, so Herdr and Ctrl+Z wouldn't see it as a job.
+    # Without HC_TERMINAL_ID, hc sends it as is, not as a note from this terminal.
+    local bin
+    bin=$(__herdr_resume_hcbin) || return 0
+    (env -u HC_TERMINAL_ID -u HC_SCOPE "$bin" send "$HC_TERMINAL_ID" "$herdr_resume_cmd" >/dev/null 2>&1 &)
   }
 
   if [ -n "${ZSH_VERSION:-}" ]; then

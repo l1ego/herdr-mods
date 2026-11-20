@@ -4,11 +4,9 @@ Brings your coding agents back after a reboot, the way the herdr TUI does, in th
 
 The Herdr app keeps its terminals (`keep: true`). When the machine reboots or herdr-core is lost,
 each one comes back in the same tab and folder, but with a fresh shell instead of the agent you
-had open. agent-resume puts the agent back. On the next start, each such terminal runs, for example:
-
-```
-herdr: resuming claude --resume 0b1c…
-```
+had open. agent-resume puts the agent back: each such terminal says
+`herdr: resuming the agent this terminal ran`, and the command appears at its prompt as if you
+had typed it, for example `claude --resume 0b1c… --model opus`.
 
 It works with Claude Code, Codex and Kimi Code, on Linux and WSL machines (the Windows app too,
 when its agents run in WSL), in bash or zsh.
@@ -28,7 +26,9 @@ when its agents run in WSL), in bash or zsh.
 - **`shell.sh`** is sourced at the end of `~/.bashrc` / `~/.zshrc`.
   - Back at a prompt, the agent has ended, so its record is removed.
   - When herdr-core starts a terminal's shell and that terminal's record names an agent that no
-    longer runs, it resumes the session, in that folder. It is also put in the shell history.
+    longer runs, it changes to the session's folder and has `hc send` type the resume command
+    at the prompt. The agent then runs as an ordinary job: Herdr shows it, and it lands in your
+    history.
 
 Resume commands:
 
@@ -58,7 +58,8 @@ Every file it changes is backed up first as `<file>.bak-agent-resume`. Run it ag
 pulling an update.
 
 It needs `python3`. Agents already running are recorded from their next session start, so
-restart them once.
+restart them once. The next time Codex starts, it says "Hooks need review": trust the new hook,
+or Codex won't run it.
 
 ## Turn it off
 
