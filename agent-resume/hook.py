@@ -102,6 +102,20 @@ def agent_process():
     return agent, start, chain[-1][0], pid
 
 
+def chain():
+    out, pid = [], os.getppid()
+    while pid > 1:
+        try:
+            comm, ppid, _ = stat(pid)
+        except OSError:
+            break
+        out.append(f"{pid}:{comm}")
+        if comm == CORE:
+            break
+        pid = ppid
+    return out
+
+
 HC = None
 
 
@@ -126,15 +140,80 @@ def state_file(terminal):
     return os.path.join(base, "herdr-agent-resume", safe)
 
 
+def read_record(path):
+    """The record's lines as {name: value}."""
+    out = {}
+    with open(path) as f:
+        for line in f:
+            name, _, value = line.rstrip("\n").partition("=")
+            words = shlex.split(value)
+            out[name] = words[0] if words else ""
+    return out
+
+
+def write_record(path, lines):
+    tmp = f"{path}.{os.getpid()}"
+    with open(tmp, "w") as f:
+        f.writelines(f"{k}={shlex.quote(v)}\n" for k, v in lines.items())
+    os.replace(tmp, path)
+
+
+def adopt(terminal, shell):
+    """After shell.sh typed a resume command: point the record at the agent once it runs.
+    Codex reports SessionStart only with its first message, so a resumed session left alone
+    would otherwise have no record, and the next reboot would lose it."""
+    path = state_file(terminal)
+    try:
+        pending = read_record(path).get("herdr_resume_proc")
+    except OSError:
+        return
+    with open("/proc/sys/kernel/random/boot_id") as f:
+        boot = f.read().strip()
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        time.sleep(0.3)
+        try:
+            lines = read_record(path)
+        except OSError:
+            return
+        if lines.get("herdr_resume_proc") != pending:
+            return  # the agent's own hook recorded it
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit():
+                continue
+            try:
+                comm, ppid, start = stat(int(entry))
+            except (OSError, ValueError):
+                continue
+            if ppid == shell and comm not in SHELLS:
+                lines["herdr_resume_proc"] = f"{boot}:{entry}:{start}"
+                write_record(path, lines)
+                log("adopted", terminal, entry, comm)
+                return
+    # The agent never started: nothing runs here to resume.
+    log("adopt gave up", terminal)
+    os.remove(path)
+
+
+def log(*parts):
+    """With a `.debug` file in the records' folder, says why each call did or didn't record."""
+    folder = os.path.dirname(state_file("x"))
+    if os.path.exists(os.path.join(folder, ".debug")):
+        with open(os.path.join(folder, "debug.log"), "a") as f:
+            f.write(" ".join(str(p) for p in (time.strftime("%m-%d %H:%M:%S"), *sys.argv[1:2], *parts)) + "\n")
+
+
 def main():
     agent = sys.argv[1] if len(sys.argv) > 1 else ""
     terminal = os.environ.get("HC_TERMINAL_ID")
+    log("start", terminal, "CODEX_THREAD_ID=" + str(os.environ.get("CODEX_THREAD_ID")))
     if agent not in KEEP or not terminal:
         return
     try:
         payload = json.load(sys.stdin)
     except Exception:
         return
+    log("payload", {k: v for k, v in payload.items() if k != "prompt"} if isinstance(payload, dict) else payload)
     if not isinstance(payload, dict) or payload.get("agent_id"):
         return  # a Claude subagent
     session = payload.get("session_id")
@@ -151,6 +230,7 @@ def main():
 
     found = agent_process()
     if not found:
+        log("skip: not the terminal's own agent", chain())
         return
     pid, start, main_pid, core = found
     global HC
@@ -159,6 +239,7 @@ def main():
         return
     info = json.loads(hc("get", terminal, "--json") or "null")
     if not isinstance(info, dict) or info.get("pid") != main_pid:
+        log("skip: terminal pid", info.get("pid") if isinstance(info, dict) else None, "!=", main_pid)
         return  # HC_TERMINAL_ID names another terminal than the one this agent runs in
 
     with open(f"/proc/{pid}/cmdline", "rb") as f:
@@ -177,16 +258,20 @@ def main():
         "herdr_resume_cmd": cmd,
         "herdr_resume_time": str(int(time.time())),
     }
-    tmp = f"{path}.{os.getpid()}"
-    with open(tmp, "w") as f:
-        f.writelines(f"{k}={shlex.quote(v)}\n" for k, v in lines.items())
-    os.replace(tmp, path)
+    write_record(path, lines)
     # Shown by `hc get`, so people and agents can see what would resume here.
     hc("label", terminal, f"resume={cmd}")
+    log("recorded", terminal, cmd)
 
 
 if __name__ == "__main__":
     try:
-        main()
-    except Exception:
-        pass
+        if sys.argv[1:2] == ["adopt"]:
+            adopt(sys.argv[2], int(sys.argv[3]))
+        else:
+            main()
+    except Exception as e:
+        try:
+            log("error", repr(e))
+        except Exception:
+            pass

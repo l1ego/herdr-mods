@@ -28,7 +28,9 @@ when its agents run in WSL), in bash or zsh.
   - When herdr-core starts a terminal's shell and that terminal's record names an agent that no
     longer runs, it changes to the session's folder and has `hc send` type the resume command
     at the prompt. The agent then runs as an ordinary job: Herdr shows it, and it lands in your
-    history.
+    history. The record follows the resumed agent at once (`hook.py adopt`), because Codex reports
+    its session only with its first message: a resumed chat you leave alone still comes back
+    after the next reboot.
 
 Resume commands:
 
@@ -60,6 +62,11 @@ pulling an update.
 It needs `python3`. Agents already running are recorded from their next session start, so
 restart them once. The next time Codex starts, it says "Hooks need review": trust the new hook,
 or Codex won't run it.
+
+## Debugging
+
+`touch ~/.local/state/herdr-agent-resume/.debug` makes `hook.py` write why it did or didn't
+record each session to `debug.log` in that folder. Remove the file to stop.
 
 ## Turn it off
 
