@@ -35,8 +35,8 @@ the `btop` package; it adds `ctrl-shift-r` to `keys.json`.
 For the recap, add this block to your layout's top bar (herdr-omarchy already has it):
 
 ```json
-{ "id": "btop", "type": "block", "size": { "px": 500 }, "window_drag": true,
+{ "id": "btop", "type": "block", "size": { "px": 0 }, "window_drag": true,
   "content": { "mod": "btop", "props": { "block": "btop" } } }
 ```
 
-`block` is the block's own id: the recap sizes it to fit (500 px, 270 px in a narrow window).
+`block` is the block's own id: the recap widens it to fit (500 px, 270 px in a narrow window); without the mod it stays empty.
