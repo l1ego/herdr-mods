@@ -326,16 +326,24 @@ export default class Btop extends View {
   renderRecap() {
     const t = theme();
     const s = this.stats;
-    const shell = h_flex().id("btop-root").size_full().items_center().justify_center().bg(t.chrome).overflow_hidden();
+    const shell = h_flex().id("btop-root").size_full().items_center().justify_center().bg(t.chrome).overflow_hidden()
+      .on_size_change((size, cx) => {
+        if (Math.abs(size.width - (this.width ?? -1)) < 1) return;
+        this.width = size.width;
+        cx.notify();
+      });
     if (!s) {
       return shell.child(div().text_size(11).text_color(t.dim).child(this.error ? "btop: —" : "…"));
     }
     const narrow = globalThis.window.viewport_size().width < 1100;
-    // Its block (props.block: the block's id) is as wide as what it shows.
+    // Its block (props.block: the block's id) is as wide as what it shows. Checked against its
+    // real width, since a layout reload (an Omarchy update) puts the block back at 0 px; asked
+    // once per width, so a zoom that scales the result doesn't loop.
     const block = props()?.block;
     const want = narrow ? WIDTH_NARROW : WIDTH;
-    if (block && this.shown !== want) {
-      this.shown = want;
+    const ask = `${want}@${Math.round(this.width ?? -1)}`;
+    if (block && (this.width === undefined || Math.abs(this.width - want) > 2) && this.asked !== ask) {
+      this.asked = ask;
       run("layout.resize", { id: block, px: want });
     }
     const sep = (i) => div().id(`btop-sep-${i}`).flex_none().text_color(t.border).child("│");
