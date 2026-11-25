@@ -29,6 +29,7 @@ const AMBER = "#ffb347", RED = "#ff5d6c";
 const LAST = "btop.machine"; // the machine the recap shows: { on }
 const LINUX = "btop.linux"; // the last Linux machine that answered: { on }
 const POPUP = "btop.popup"; // the open popup's btop terminal
+const LABEL = "herdr-mod-btop"; // marks the btop terminals this mod starts
 const READ = "head -1 /proc/stat; cat /proc/meminfo /proc/net/dev";
 // Windows: CPU load, available memory, paging file and network rates, as one JSON line.
 const WIN_READ = [
@@ -248,10 +249,12 @@ export default class Btop extends View {
   // --- Launcher ---
 
   async launch(cx) {
-    const open = shared(POPUP)?.terminal;
-    if (open && terminals().some((x) => x.address === open)) {
-      run("pane.focus", { terminal: open });
-      return;
+    // The popup is already open when its btop has the keyboard (ctrl-shift-r inside it).
+    if (focused()?.terminal && focused().terminal === shared(POPUP)?.terminal) return;
+    // A btop of ours still running has lost its popup (an app or mod reload closed it without
+    // ending btop): end it rather than leave it running unseen.
+    for (const x of terminals()) {
+      if (x.labels?.[LABEL] && x.state !== "finished") run("terminal.kill", { terminal: x.address });
     }
     const last = shared(LAST);
     const on = last ? last.on : target(); // the machine the recap shows
@@ -272,7 +275,7 @@ export default class Btop extends View {
         return;
       }
     }
-    const args = ["run", "--json", "--bg", "--no-parent", "--rm", "--name", `btop-${Date.now() % 1e6}`];
+    const args = ["run", "--json", "--bg", "--no-parent", "--rm", "--name", `btop-${Date.now() % 1e6}`, "--label", `${LABEL}=1`];
     if (on) args.push("--on", on);
     args.push("--", program);
     const r = await hc(args).catch((e) => ({ code: 1, stdout: "", stderr: String(e?.message ?? e) }));
@@ -300,9 +303,13 @@ export default class Btop extends View {
         ],
       },
     });
-    // The dialog's terminal block exists from its next frame: give it the keyboard then.
-    await cx.sleep(80);
-    if (terminals().some((x) => x.address === address)) run("pane.focus", { terminal: address });
+    // The dialog gives its terminal the keyboard by itself. pane.focus can't reach a terminal in
+    // an overlay by another machine's address ("no such pane"): only a fallback, if it didn't.
+    await cx.sleep(500);
+    const f = focused();
+    if (f?.terminal !== address && terminals().some((x) => x.address === address)) {
+      run("pane.focus", { terminal: address });
+    }
   }
 
   /** btop4win or btop on this Windows computer, or null. */
