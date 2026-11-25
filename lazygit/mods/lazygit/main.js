@@ -63,9 +63,12 @@ export default class Lazygit extends View {
         ],
       },
     });
-    // The dialog's terminal block exists from its next frame: give it the keyboard then.
-    await cx.sleep(80);
-    if (terminals().some((x) => x.address === address)) run("pane.focus", { terminal: address });
+    // The dialog gives its terminal the keyboard by itself. pane.focus can't reach a terminal in
+    // an overlay by another machine's address ("no such pane"): only a fallback, if it didn't.
+    await cx.sleep(500);
+    if (focused()?.terminal !== address && terminals().some((x) => x.address === address)) {
+      run("pane.focus", { terminal: address });
+    }
   }
 
   render() {
