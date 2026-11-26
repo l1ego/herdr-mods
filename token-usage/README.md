@@ -6,7 +6,7 @@ today's total in the top bar, and a popup (`ctrl-shift-u`) with the details.
 - **Bar**: today's tokens on every machine and what they would cost through the API
   (`2.4B tok · ~$681`), with a small bar per agent. Hover it for the split by agent; click it for
   the popup.
-- **Popup**: choose a period (today, 7, 30 or 90 days, everything) and a machine. It shows the
+- **Popup**: choose a period (today, 7, 30 or 90 days, everything) and a machine from two drop-down menus. It shows the
   totals (tokens, estimated cost, requests, share of input read from the cache), a chart of tokens
   per day stacked by agent, and a table by agent and model: requests, fresh input, cache reads,
   cache writes, output, total and cost.

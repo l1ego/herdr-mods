@@ -17,7 +17,7 @@
 // cost is only what the same tokens would cost through the API.
 
 import { View, div } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex, h_flex, Popover } from "gpui-base";
 import {
   props, run, theme, settings, exec, machines, appHome, readTextFile, shared, setShared, closeOverlay,
   checking, window as appWindow,
@@ -325,10 +325,19 @@ export default class TokenUsage extends View {
       .when(Boolean(overlay), (el) => el.child(div().id("tu-close").px(6).cursor_pointer().text_color(t.dim)
         .hover((s) => s.text_color(t.foreground)).on_click(() => closeOverlay(overlay)).child("✕")));
 
-    const filters = h_flex().gap(16).pb(12).items_center()
-      .child(this.chips("tu-period", PERIODS, this.period, (v) => { this.period = v; }, t))
-      .when(keys.length > 1, (el) => el.child(this.chips("tu-machine",
-        [[null, "Tutte le macchine"], ...keys.map((k) => [k, data[k].name])], this.machine, (v) => { this.machine = v; }, t)));
+    const end = Object.values(data).map((m) => m.data?.today).filter(Boolean).sort().pop();
+    const range = (v) => {
+      if (!end) return "";
+      if (v === "today") return dayLabel(end);
+      if (v === "all") return "dal primo log";
+      return `${dayLabel(shiftDay(end, 1 - Number(v)))} – ${dayLabel(end)}`;
+    };
+    const filters = h_flex().gap(8).pb(12).items_center()
+      .child(this.dropdown("tu-period", "Periodo", PERIODS.map(([v, text]) => [v, text, range(v)]), this.period,
+        (v) => { this.period = v; }, t))
+      .when(keys.length > 1, (el) => el.child(this.dropdown("tu-machine", "Macchina",
+        [[null, "Tutte", `${keys.length} macchine`], ...keys.map((k) => [k, data[k].name, data[k].data?.machine ?? ""])],
+        this.machine, (v) => { this.machine = v; }, t)));
 
     const body = Object.values(data).some((m) => m.data)
       ? v_flex().gap(16).child(this.tiles(list, t)).child(this.chart(t)).child(this.table(list, t)).child(this.notes(list, t))
@@ -353,15 +362,32 @@ export default class TokenUsage extends View {
     return parts.join(" · ");
   }
 
-  chips(id, options, value, set, t) {
-    return h_flex().gap(4).children(options.map(([v, text]) => {
-      const on = v === value;
-      return div().id(`${id}-${v ?? "all"}`).px(10).py(3).rounded(6).text_size(12).cursor_pointer()
-        .bg(on ? t.selected : t.raised).text_color(on ? t.foreground : t.muted).border_1().border_color(on ? t.input : t.border)
-        .hover((s) => s.text_color(t.foreground))
-        .on_click((_e, cx) => { set(v); cx.notify(); })
-        .child(text);
-    }));
+  /** A drop-down menu: the trigger shows the label and the choice; options are [value, text, hint]. */
+  dropdown(id, label, options, value, set, t) {
+    const open = this.menu === id;
+    const chosen = options.find(([v]) => v === value) ?? options[0];
+    const trigger = h_flex().id(`${id}-trigger`).h(30).pl(10).pr(8).gap(8).items_center().rounded(7).border_1()
+      .border_color(open ? t.accent : t.input).bg(open ? t.selected : t.raised).text_size(12).cursor_pointer()
+      .hover((s) => s.bg(t.hover))
+      .child(div().text_color(t.dim).child(label))
+      .child(div().font_semibold().text_color(t.foreground).child(chosen[1]))
+      .child(div().text_size(10).text_color(open ? t.accent : t.dim).child(open ? "▴" : "▾"));
+    const menu = v_flex().id(`${id}-menu`).mt(4).min_w(220).p(4).gap(1).rounded(8).border_1().border_color(t.border)
+      .bg(t.popover).shadow_lg()
+      .children(options.map(([v, text, hint]) => {
+        const on = v === value;
+        return h_flex().id(`${id}-${v ?? "all"}`).h(28).px(8).gap(10).items_center().rounded(5).text_size(12).cursor_pointer()
+          .when(on, (el) => el.bg(t.selected))
+          .hover((s) => s.bg(t.hover))
+          .on_click((_e, cx) => { set(v); this.menu = null; cx.notify(); })
+          .child(div().w(12).text_color(t.accent).child(on ? "✓" : ""))
+          .child(div().flex_1().whitespace_nowrap().text_color(on ? t.foreground : t.muted).when(on, (el) => el.font_semibold()).child(text))
+          .child(div().whitespace_nowrap().text_size(11).text_color(t.dim).child(hint ?? ""));
+      }));
+    return Popover.new(id).open(open).anchor("top_left")
+      .on_open_change((now, cx) => { this.menu = now ? id : null; cx.notify(); })
+      .trigger(trigger)
+      .content(menu);
   }
 
   tiles(list, t) {
