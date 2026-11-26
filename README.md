@@ -8,6 +8,7 @@ Small additions to [Herdr](https://herdr.dev), made while using the Herdr app ev
 | [`lazygit`](lazygit) | Lazygit in a popup over the window, on the focused terminal's folder and machine (`ctrl-shift-g`) | Mod Manager → install from `https://github.com/l1ego/herdr-mods` |
 | [`agent-questions`](agent-questions) | The questions agents asked you (Codex closes its question card when its turn ends), in a popup you can answer from (`ctrl-shift-q`), plus a badge for the bar | Mod Manager → install from `https://github.com/l1ego/herdr-mods` |
 | [`btop`](btop) | A recap of CPU, memory and network in the top bar, and btop in a popup when clicked (`ctrl-shift-r`); Linux machines and the Windows app's own machine | Mod Manager → install from `https://github.com/l1ego/herdr-mods` |
+| [`token-usage`](token-usage) | The tokens Claude Code, Codex and Kimi Code used: today's total in the top bar, and a popup by day and model with the estimated API cost (`ctrl-shift-u`), like t3code's Usage page | Mod Manager → install from `https://github.com/l1ego/herdr-mods` |
 
 They work with any layout, including [herdr-omarchy](https://github.com/l1ego/herdr-omarchy).
 
@@ -19,6 +20,7 @@ herdr-app check lazygit/mods/lazygit
 herdr-app check lazygit/mods/lazygit-bar
 herdr-app check agent-questions/mods/agent-questions
 herdr-app check btop/mods/btop
+herdr-app check token-usage/mods/token-usage
 ```
 
 MIT licensed.
